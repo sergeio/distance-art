@@ -1,15 +1,10 @@
 (ns art
-  (:import (javax.swing JLabel)
-           (java.awt Graphics Color)))
-
-(defn random-points [num-points x y]
-  (for [_ (range num-points)]
-    [(rand-int x) (rand-int y) (rand-int 256) (rand-int 256) (rand-int 256)]))
+  (:import (javax.swing JFrame JLabel)
+           (java.awt Graphics Dimension Color)
+           (java.awt.image BufferedImage)))
 
 (def MAX-POINTS 10)
 (def SIZE 400)
-(def set-points (random-points MAX-POINTS SIZE SIZE))
-
 
 (defn paint-canvas [graphics size closest-point-fn]
   (doseq [y (range size)
@@ -33,6 +28,29 @@
       (.setSize (Dimension. size size))
       (.show))))
 
+
+;;;;;;;;;;;;;;;
+;util functions
+;;;;;;;;;;;;;;;
+
+(defn random-points [num-points x y]
+  (for [_ (range num-points)]
+    [(rand-int x) (rand-int y) (rand-int 256) (rand-int 256) (rand-int 256)]))
+
+(defn divisible-by-fn [by-what]
+  "Curry function that will test if a number is divisible by-something."
+  (fn [number] (let [quotient (/ (int number) by-what)]
+                 (= (int quotient) quotient))))
+
+(defn square [x] (* x x))
+
+(defn min-by [f coll]
+  (when (seq coll)
+    (reduce (fn [min this] (if (< (f min) (f this)) min this))
+            coll)))
+
+(defn abs [x]
+  (if (>= x 0) x (- x)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;
 ; distance transformators
@@ -76,32 +94,18 @@
     (* 2 (f x1 y1 x2 y2))
     (f x1 y1 x2 y2)))
 
-;(defn scanline [dist])
+(defn scanline [f-shape scanline-width]
+  (fn [f-dist x1 y1 x2 y2]
+    (if ((divisible-by-fn scanline-width) (f-shape x1 y1 x2 y2))
+      (* 1000 (f-dist x1 y1 x2 y2))
+      (f-dist x1 y1 x2 y2))))
+
 (defn abstract-scanline [f-scanline-dist f-scanline-shape f-dist x1 y1 x2 y2]
   "Usage: (abstract-scanline distance-evener distance-average x1 y1 x2 y2)"
         (if (f-scanline-shape (f-scanline-dist x1 y1 x2 y2))
           (* 1000 (f-dist x1 y1 x2 y2))
           (f-dist x1 y1 x2 y2)))
 
-
-;;;;;;;;;;;;;;;
-;util functions
-;;;;;;;;;;;;;;;
-
-(defn divisible-by-fn [by-what]
-  "Curry function that will test if a number is divisible by-something."
-  (fn [number] (let [quotient (/ (int number) by-what)]
-                 (= (int quotient) quotient))))
-
-(defn square [x] (* x x))
-
-(defn min-by [f coll]
-  (when (seq coll)
-    (reduce (fn [min this] (if (< (f min) (f this)) min this))
-            coll)))
-
-(defn abs [x]
-  (if (>= x 0) x (- x)))
 
 ;;;;;;;;;;;;;;;;;;;
 ;distance functions
@@ -207,19 +211,6 @@
                                              x1 y1 x2 y2))]
     (min-by distance-curry set-points)))
 
-(defn draw-point [gfx [x y] [r g b]]
-  (do (.setColor gfx (java.awt.Color. r g b))
-      (.drawLine gfx x y x y)))
-
-(defn draw-circle [gfx [x y] [r g b] radius]
-  (do (.setColor gfx (java.awt.Color. r g b))
-      (.drawOval gfx (- x radius) (- y radius) (* 2 radius) (* 2 radius))))
-
-(defn fill-frame [gfx closest-point-fn]
-  (doseq [x (range X) y (range Y)]
-    (let [[x2 y2 r g b] (closest-point-fn x y)]
-      (draw-point gfx [x y] [r g b]))))
-
 (defn get-closest-point-fn [f-distance set-points]
   (fn [x1 y1]
     (let [distance-to-set-point (fn [[x2 y2 _ _ _]] (f-distance x1 y1 x2 y2))]
@@ -233,25 +224,24 @@
 
 (defn compose [f & fs]
   (if (empty? fs) f
-    (apply compose (cons (fn [x1 y1 x2 y2] ((first fs) f x1 y1 x2 y2)) (rest fs)))))
+    (let [second-func-curried (fn [x1 y1 x2 y2] ((first fs) f x1 y1 x2 y2))]
+      (apply compose (cons second-func-curried (rest fs))))))
 
 (def d1 (compose distance-min-max sum-scanline))
 (def d2 (compose distance-min-max mult-scanline))
 (def d3 (compose distance-min-max sum-scanline mult-scanline))
 (def d4 (compose distance-min-max sum-scanline mult-scanline))
 
-(defn main []
-  (draw SIZE (get-closest-point-fn d3 set-points))
-  ; (fill-frame (make-frame-graphics X Y)
-  ;             (get-closest-point-fn distance4 set-points))
+(def gcp2 (compose distance-max-dimension (scanline distance-min-dimension 3)))
 
-  ; (fill-frame (make-frame-graphics X Y)
-  ;             (get-closest-point-fn d1 set-points))
-  ; (fill-frame (make-frame-graphics X Y)
-  ;             (get-closest-point-fn d2 set-points))
-  ; (fill-frame (make-frame-graphics X Y)
-  ;             (get-closest-point-fn d3 set-points))
-)
+(defn main []
+  (let [set-points (random-points MAX-POINTS SIZE SIZE)]
+    ; (draw SIZE (fn [x1 x2] (get-closest-point2 x1 x2 set-points)))
+    (draw SIZE (get-closest-point-fn gcp2 set-points))
+    ; (draw SIZE (get-closest-point-fn d1 set-points))
+    ; (draw SIZE (get-closest-point-fn d2 set-points))
+    ; (draw SIZE (get-closest-point-fn d3 set-points))
+))
 
 (main)
 
