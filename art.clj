@@ -1,47 +1,38 @@
 (ns art
-  (:import (javax.swing JFrame JLabel)
-           (java.awt Graphics Dimension Color)
-           (java.awt.image BufferedImage)))
+  (:import (javax.swing JLabel)
+           (java.awt Graphics Color)))
 
 (defn random-points [num-points x y]
   (for [_ (range num-points)]
     [(rand-int x) (rand-int y) (rand-int 256) (rand-int 256) (rand-int 256)]))
 
 (def MAX-POINTS 10)
-(def X 400)
-(def Y 400)
-(def set-points (random-points MAX-POINTS X Y))
-
-; (defn make-frame-graphics [x y]
-;   (let [frame (java.awt.Frame.)]
-;     (.setSize frame (java.awt.Dimension. x y))
-;     (.setVisible frame true)
-;     (.getGraphics frame)))
+(def SIZE 400)
+(def set-points (random-points MAX-POINTS SIZE SIZE))
 
 
-; (defn make-frame-graphics [x y]
-;   (let [image  (java.awt.image.BufferedImage. x y java.awt.image.BufferedImage/TYPE_INT_RGB)]
-;         ; canvas (proxy [JLabel] []
-;         ;          (paint [g] (.drawImage g image 0 0 this)))
-;     (doto (javax.swing.JFrame.)
-;       ;(.add )
-;       (.setSize (java.awt.Dimension. x y))
-;       (.show))
-;     (.createGraphics image)
-;     ))
+(defn paint-canvas [graphics size closest-point-fn]
+  (doseq [y (range size)
+          x (range size)]
 
+    (let [[_ _ r g b] (closest-point-fn x y)]
+      ; can maybe save some time if I store the color object instead of
+      ; creating it for every point anew
+      (.setColor graphics (Color. r g b))
+      (.drawLine graphics x y x y))))
 
-; (defn make-frame-graphics [x y]
-;   (let [canvask
-;   (doto (javax.swing.JFrame.)
-;     (.add canvas
+(defn draw [size closest-point-fn]
+  (let [image (BufferedImage. size size BufferedImage/TYPE_INT_RGB)
+        canvas (proxy [JLabel] []
+                 (paint [g] (.drawImage g image 0 0 this)))]
 
-(defn abs [x]
-  (if (>= x 0) x (- x)))
+    (paint-canvas (.createGraphics image) size closest-point-fn)
 
-(defn distance-average-random-negative [x1 y1 x2 y2]
-  (let [average (/ (+ (abs (- x2 x1)) (abs (- y2 y1))) 2)]
-    (if (zero? (rand-int 2)) (- average) average)))
+    (doto (JFrame.)
+      (.add canvas)
+      (.setSize (Dimension. size size))
+      (.show))))
+
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;
 ; distance transformators
@@ -109,6 +100,9 @@
     (reduce (fn [min this] (if (< (f min) (f this)) min this))
             coll)))
 
+(defn abs [x]
+  (if (>= x 0) x (- x)))
+
 ;;;;;;;;;;;;;;;;;;;
 ;distance functions
 ;;;;;;;;;;;;;;;;;;;
@@ -117,6 +111,16 @@
   (let [average (/ (+ (abs (- x2 x1)) (abs (- y2 y1))) 2)]
     (if (even? (+ x1 y1 x2 y2)) (* 2 average) average)))
 
+(defn distance-average [x1 y1 x2 y2]
+  (/ (+ (abs (- x2 x1)) (abs (- y2 y1))) 2))
+
+(defn distance-average-mixmatch [x1 y1 x2 y2]
+  (/ (+ (abs (- x2 y1)) (abs (- y2 x1))) 2))
+
+(defn distance-average-random-negative [x1 y1 x2 y2]
+  (let [average (/ (+ (abs (- x2 x1)) (abs (- y2 y1))) 2)]
+    (if (zero? (rand-int 2)) (- average) average)))
+
 (defn distance-average-random-double [x1 y1 x2 y2]
   (let [average (/ (+ (abs (- x2 x1)) (abs (- y2 y1))) 2)]
     (if (zero? (rand-int 2)) (* 2 average) average)))
@@ -124,12 +128,6 @@
 (defn distance-average-random-triple [x1 y1 x2 y2]
   (let [average (/ (+ (abs (- x2 x1)) (abs (- y2 y1))) 2)]
     (if (zero? (rand-int 2)) (* 3 average) average)))
-
-(defn distance-average [x1 y1 x2 y2]
-  (/ (+ (abs (- x2 x1)) (abs (- y2 y1))) 2))
-
-(defn distance-average-mixmatch [x1 y1 x2 y2]
-  (/ (+ (abs (- x2 y1)) (abs (- y2 x1))) 2))
 
 (defn distance-linear-reversed [x1 y1 x2 y2]
   (- (+ (abs (- x2 x1)) (abs (- y2 y1)))))
@@ -242,30 +240,8 @@
 (def d3 (compose distance-min-max sum-scanline mult-scanline))
 (def d4 (compose distance-min-max sum-scanline mult-scanline))
 
-(defn paint-canvas [graphics size closest-point-fn]
-  (doseq [y (range size)
-          x (range size)]
-
-    (let [[_ _ r g b] (closest-point-fn x y)]
-      ; can maybe save some time if I store the color object instead of
-      ; creating it for every point anew
-      (.setColor graphics (Color. r g b))
-      (.drawLine graphics x y x y))))
-
-(defn draw [size closest-point-fn]
-  (let [image (BufferedImage. size size BufferedImage/TYPE_INT_RGB)
-        canvas (proxy [JLabel] []
-                 (paint [g] (.drawImage g image 0 0 this)))]
-
-    (paint-canvas (.createGraphics image) size closest-point-fn)
-
-    (doto (JFrame.)
-      (.add canvas)
-      (.setSize (Dimension. size size))
-      (.show))))
-
 (defn main []
-  (draw X (get-closest-point-fn distance4 set-points))
+  (draw SIZE (get-closest-point-fn d3 set-points))
   ; (fill-frame (make-frame-graphics X Y)
   ;             (get-closest-point-fn distance4 set-points))
 
