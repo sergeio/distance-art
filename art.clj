@@ -1,19 +1,40 @@
-(ns art)
+(ns art
+  (:import (javax.swing JFrame JLabel)
+           (java.awt Graphics Dimension Color)
+           (java.awt.image BufferedImage)))
 
 (defn random-points [num-points x y]
   (for [_ (range num-points)]
-    [(rand-int x) (rand-int y) (rand-int 255) (rand-int 255) (rand-int 255)]))
+    [(rand-int x) (rand-int y) (rand-int 256) (rand-int 256) (rand-int 256)]))
 
 (def MAX-POINTS 10)
-(def X 100)
-(def Y 100)
+(def X 400)
+(def Y 400)
 (def set-points (random-points MAX-POINTS X Y))
 
-(defn make-frame-graphics [x y]
-  (let [frame (java.awt.Frame.)]
-    (.setSize frame (java.awt.Dimension. x y))
-    (.setVisible frame true)
-    (.getGraphics frame)))
+; (defn make-frame-graphics [x y]
+;   (let [frame (java.awt.Frame.)]
+;     (.setSize frame (java.awt.Dimension. x y))
+;     (.setVisible frame true)
+;     (.getGraphics frame)))
+
+
+; (defn make-frame-graphics [x y]
+;   (let [image  (java.awt.image.BufferedImage. x y java.awt.image.BufferedImage/TYPE_INT_RGB)]
+;         ; canvas (proxy [JLabel] []
+;         ;          (paint [g] (.drawImage g image 0 0 this)))
+;     (doto (javax.swing.JFrame.)
+;       ;(.add )
+;       (.setSize (java.awt.Dimension. x y))
+;       (.show))
+;     (.createGraphics image)
+;     ))
+
+
+; (defn make-frame-graphics [x y]
+;   (let [canvask
+;   (doto (javax.swing.JFrame.)
+;     (.add canvas
 
 (defn abs [x]
   (if (>= x 0) x (- x)))
@@ -64,6 +85,7 @@
     (* 2 (f x1 y1 x2 y2))
     (f x1 y1 x2 y2)))
 
+;(defn scanline [dist])
 (defn abstract-scanline [f-scanline-dist f-scanline-shape f-dist x1 y1 x2 y2]
   "Usage: (abstract-scanline distance-evener distance-average x1 y1 x2 y2)"
         (if (f-scanline-shape (f-scanline-dist x1 y1 x2 y2))
@@ -189,7 +211,7 @@
 
 (defn draw-point [gfx [x y] [r g b]]
   (do (.setColor gfx (java.awt.Color. r g b))
-      (.fillRect gfx x y 1 1)))
+      (.drawLine gfx x y x y)))
 
 (defn draw-circle [gfx [x y] [r g b] radius]
   (do (.setColor gfx (java.awt.Color. r g b))
@@ -198,9 +220,7 @@
 (defn fill-frame [gfx closest-point-fn]
   (doseq [x (range X) y (range Y)]
     (let [[x2 y2 r g b] (closest-point-fn x y)]
-      (if (= [x y] [x2 y2])
-        (draw-point gfx [x y] [0 0 0])
-        (draw-point gfx [x y] [r g b])))))
+      (draw-point gfx [x y] [r g b]))))
 
 (defn get-closest-point-fn [f-distance set-points]
   (fn [x1 y1]
@@ -217,14 +237,44 @@
   (if (empty? fs) f
     (apply compose (cons (fn [x1 y1 x2 y2] ((first fs) f x1 y1 x2 y2)) (rest fs)))))
 
-(def dd (compose distance-min-max blur))
+(def d1 (compose distance-min-max sum-scanline))
+(def d2 (compose distance-min-max mult-scanline))
+(def d3 (compose distance-min-max sum-scanline mult-scanline))
+(def d4 (compose distance-min-max sum-scanline mult-scanline))
+
+(defn paint-canvas [graphics size closest-point-fn]
+  (doseq [y (range size)
+          x (range size)]
+
+    (let [[_ _ r g b] (closest-point-fn x y)]
+      ; can maybe save some time if I store the color object instead of
+      ; creating it for every point anew
+      (.setColor graphics (Color. r g b))
+      (.drawLine graphics x y x y))))
+
+(defn draw [size closest-point-fn]
+  (let [image (BufferedImage. size size BufferedImage/TYPE_INT_RGB)
+        canvas (proxy [JLabel] []
+                 (paint [g] (.drawImage g image 0 0 this)))]
+
+    (paint-canvas (.createGraphics image) size closest-point-fn)
+
+    (doto (JFrame.)
+      (.add canvas)
+      (.setSize (Dimension. size size))
+      (.show))))
 
 (defn main []
-  (fill-frame (make-frame-graphics X Y)
-              (get-closest-point-fn distance4 set-points))
+  (draw X (get-closest-point-fn distance4 set-points))
+  ; (fill-frame (make-frame-graphics X Y)
+  ;             (get-closest-point-fn distance4 set-points))
 
-  (fill-frame (make-frame-graphics X Y)
-              (get-closest-point-fn dd set-points))
+  ; (fill-frame (make-frame-graphics X Y)
+  ;             (get-closest-point-fn d1 set-points))
+  ; (fill-frame (make-frame-graphics X Y)
+  ;             (get-closest-point-fn d2 set-points))
+  ; (fill-frame (make-frame-graphics X Y)
+  ;             (get-closest-point-fn d3 set-points))
 )
 
 (main)
