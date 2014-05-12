@@ -18,12 +18,13 @@
       (.setColor graphics (Color. r g b))
       (.drawLine graphics x y x y))))
 
-(defn draw [& {:keys [size closest-point-fn]
-               :or {size 250 closest-point-fn (fn [x y] [3 14 0 255 128])}}]
+(defn draw [& {:keys [size closest-point-fn name]
+               :or {size 250 closest-point-fn (fn [x y] [3 14 0 255 128]) :name ": )"}}]
   (let [image (BufferedImage. size size BufferedImage/TYPE_INT_RGB)
         canvas (proxy [JLabel] [] (paint [g] (.drawImage g image 0 0 this)))]
     (paint-canvas (.createGraphics image) size closest-point-fn)
     (doto (JFrame.)
+      (.setTitle name)
       (.add canvas)
       (.setSize (Dimension. size size))
       (.show))))
@@ -172,14 +173,12 @@
 
 (defn main []
   (let [set-points (random-points MAX-POINTS SIZE SIZE)
-        easy-draw (fn [f-dist]
+        easy-draw (fn [f-dist & name]
                     (draw :size SIZE
                           :closest-point-fn (get-closest-point-fn f-dist set-points)
+                          :name name
                     ))]
-    (easy-draw d1)
-    (easy-draw d2)
-    (easy-draw d3)
-    (easy-draw d4)
+    (easy-draw gcp1 "gcp1")
 ))
 
 
