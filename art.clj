@@ -9,25 +9,29 @@
 (defn draw-circle [gfx x y radius]
   (.drawOval gfx (- x radius) (- y radius) (* 2 radius) (* 2 radius)))
 
-(defn paint-canvas [graphics size closest-point-fn]
-  (doseq [y (range size)
-          x (range size)]
-    (let [[_ _ r g b] (closest-point-fn x y)]
-      ; can maybe save some time if I store the color object instead of
-      ; creating it for every point anew
-      (.setColor graphics (Color. r g b))
-      (.drawLine graphics x y x y))))
+(defn paint-canvas [buffer size graphics]
+  (doseq [x (range size)
+          y (range size)]
+    (.setColor graphics (aget buffer x y))
+    (.drawLine graphics x y x y)))
 
-(defn draw [& {:keys [size closest-point-fn name]
-               :or {size 250 closest-point-fn (fn [x y] [3 14 0 255 128]) :name ": )"}}]
-  (let [image (BufferedImage. size size BufferedImage/TYPE_INT_RGB)
-        canvas (proxy [JLabel] [] (paint [g] (.drawImage g image 0 0 this)))]
-    (paint-canvas (.createGraphics image) size closest-point-fn)
+(defn draw [buffer size]
+  (let [image  (BufferedImage. size size BufferedImage/TYPE_INT_RGB)
+        canvas (proxy [JLabel] []
+                 (paint [g] (.drawImage g image 0 0 this)))]
+
+    (paint-canvas buffer size (.createGraphics image))
+
     (doto (JFrame.)
-      (.setTitle (str name))
       (.add canvas)
       (.setSize (Dimension. size size))
       (.show))))
+
+(defn calculate-colors [size closest-point-fn]
+  (to-array-2d (for [x (range size)]
+                 (for [y (range size)]
+                   (let [[_ _ r g b] (closest-point-fn x y)]
+                     (Color. r g b))))))
 
 
 ;;;;;;;;;;;;;;;
@@ -162,9 +166,11 @@
                           :closest-point-fn (get-closest-point-fn f-dist set-points)
                           :name name
                     ))]
-    (easy-draw (compose d-avg (scanline2 d-min :width 3) noise-blur (scanline2 d-avg :width 3) (scanline2 d-max :width 3) (scanline2 d-linear :width 3)) "s4")
-    (easy-draw (compose d-avg (scanline2 d-min) noise-blur (scanline2 d-avg) (scanline2 d-max) (scanline2 d-linear)) "s4")
-    (easy-draw (compose d-avg (scanline2 d-min) (scanline2 d-avg) (scanline2 d-max) (scanline2 d-linear) ) "s4")
+    (def xy (calculate-colors SIZE (get-closest-point-fn d-max set-points)))
+    (draw xy SIZE)
+    ; (easy-draw (compose d-avg (scanline2 d-min :width 3) noise-blur (scanline2 d-avg :width 3) (scanline2 d-max :width 3) (scanline2 d-linear :width 3)) "s4")
+    ; (easy-draw (compose d-avg (scanline2 d-min) noise-blur (scanline2 d-avg) (scanline2 d-max) (scanline2 d-linear)) "s4")
+    ; (easy-draw (compose d-avg (scanline2 d-min) (scanline2 d-avg) (scanline2 d-max) (scanline2 d-linear) ) "s4")
 ))
 
 
