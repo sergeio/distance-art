@@ -24,7 +24,7 @@
         canvas (proxy [JLabel] [] (paint [g] (.drawImage g image 0 0 this)))]
     (paint-canvas (.createGraphics image) size closest-point-fn)
     (doto (JFrame.)
-      (.setTitle name)
+      (.setTitle (str name))
       (.add canvas)
       (.setSize (Dimension. size size))
       (.show))))
@@ -35,6 +35,7 @@
 ;;;;;;;;;;;;;;;
 
 (defn random-points [num-points x y]
+  "Create random [x y r g b] points."
   (for [_ (range num-points)]
     [(rand-int x) (rand-int y) (rand-int 256) (rand-int 256) (rand-int 256)]))
 
@@ -46,6 +47,7 @@
 (defn square [x] (* x x))
 
 (defn min-by [f coll]
+  "Returns the (min (map f coll))"
   (when (seq coll)
     (reduce (fn [min this] (if (< (f min) (f this)) min this))
             coll)))
@@ -80,15 +82,9 @@
 ;distance functions
 ;;;;;;;;;;;;;;;;;;;
 
-(defn d-evener [x1 y1 x2 y2]
-  (let [average (/ (+ (abs (- x2 x1)) (abs (- y2 y1))) 2)]
-    (if (even? (+ x1 y1 x2 y2)) (* 2 average) average)))
-
 (defn d-avg [x1 y1 x2 y2]
+  "Distance that averages the distance in the x direction and the y direction"
   (/ (+ (abs (- x2 x1)) (abs (- y2 y1))) 2))
-
-(defn d-avg-mismatch [x1 y1 x2 y2]
-  (/ (+ (abs (- x2 y1)) (abs (- y2 x1))) 2))
 
 (defn d-avg-rand-neg [x1 y1 x2 y2]
   (let [average (/ (+ (abs (- x2 x1)) (abs (- y2 y1))) 2)]
@@ -124,11 +120,6 @@
   (let [xdist (abs (- x2 x1)) ydist (abs (- y2 y1))]
     (min xdist ydist)))
 
-(defn d-avg-dimension [x1 y1 x2 y2]
-  "Distance that averages the distance in the x direction and the y direction"
-  (let [xdist (abs (- x2 x1)) ydist (abs (- y2 y1))]
-    (/ (+ xdist ydist) 2)))
-
 (defn d-min-max [x1 y1 x2 y2]
   "Distance that averages min-dist and max-dist."
   (let [min-dist (d-min x1 y1 x2 y2)
@@ -150,10 +141,10 @@
       (f-dist x1 y1 x2 y2))))
 
 
+; some example composite "distance" functions:
 (def busy (compose d-min (scanline d-euclidean)))
 (def scanny (compose d-max (scanline d-euclidean)))
 (def noisy (compose d-min (scanline + :width 5) noise-blur))
-
 (def gcp1 (compose d-min (scanline d-min :width 5)))
 (def gcp2 (compose d-max (scanline d-linear-r :width 2)))
 (def gcp3 (compose d-max (scanline d-euclidean-r :width 4)))
@@ -161,13 +152,6 @@
 (def gcp5 (compose d-max (scanline d-min :width 3)))
 (def gcp6 (compose d-max (scanline d-euclidean)))
 (def gcp7 (compose d-max (scanline d-avg-rand-dbl)))
-(def gcp8 (compose d-max (scanline d-min :width 3)))
-
-(def d1 (compose d-min-max (scanline +)))
-(def d2 (compose d-min-max (scanline *)))
-(def d3 (compose d-min-max (scanline +) (scanline *)))
-(def d4 (compose d-min-max (scanline + :width 3) (scanline * :width 3)))
-
 (def t1 (compose d-min (scanline + :width 5) noise-blur))
 (def t2 (compose d-min noise-blur (scanline + :width 5)))
 
@@ -178,18 +162,10 @@
                           :closest-point-fn (get-closest-point-fn f-dist set-points)
                           :name name
                     ))]
-    (easy-draw gcp1 "gcp1")
+    (easy-draw (compose d-avg (scanline2 d-min :width 3) noise-blur (scanline2 d-avg :width 3) (scanline2 d-max :width 3) (scanline2 d-linear :width 3)) "s4")
+    (easy-draw (compose d-avg (scanline2 d-min) noise-blur (scanline2 d-avg) (scanline2 d-max) (scanline2 d-linear)) "s4")
+    (easy-draw (compose d-avg (scanline2 d-min) (scanline2 d-avg) (scanline2 d-max) (scanline2 d-linear) ) "s4")
 ))
 
 
 (main)
-
-;What I really want is a framework that makes it very simple to do things.
-;for each point set color color-func
-;for each pair of points, connect by a line of color color-func, opacity 3
-;
-;Do this sort of personal-space simulation in real-time, with an led floor and
-;either pressure pads in the floor or good computer vision / kinects
-
-;visualize each distance function by plotting distances from a point, with a
-;gradient, similar to topology maps
