@@ -3,16 +3,13 @@
            (java.awt Graphics Dimension Color)
            (java.awt.image BufferedImage)))
 
-(def MAX-POINTS 40)
-(def SIZE 600)
-
 (defn draw-circle [gfx x y radius]
   (.drawOval gfx (- x radius) (- y radius) (* 2 radius) (* 2 radius)))
 
 (defn paint-canvas [buffer size graphics]
   (doseq [x (range size)
           y (range size)]
-    (.setColor graphics (aget buffer x y))
+    (.setColor graphics (get-in buffer [x y]))
     (.drawLine graphics x y x y)))
 
 (defn draw [buffer size]
@@ -28,10 +25,10 @@
       (.show))))
 
 (defn calculate-colors [size closest-point-fn]
-  (to-array-2d (for [x (range size)]
-                 (for [y (range size)]
-                   (let [[_ _ r g b] (closest-point-fn x y)]
-                     (Color. r g b))))))
+  (into [] (for [x (range size)]
+             (into [] (for [y (range size)]
+                        (let [[_ _ r g b] (closest-point-fn x y)]
+                          (Color. r g b)))))))
 
 
 ;;;;;;;;;;;;;;;
@@ -58,6 +55,13 @@
 
 (defn abs [x]
   (if (>= x 0) x (- x)))
+
+(defn average [nums]
+  (/ (reduce + nums) (count nums)))
+
+(defn prinret [value]
+  (println value)
+  value)
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -150,7 +154,7 @@
 (def scanny (compose d-max (scanline d-euclidean)))
 (def noisy (compose d-min (scanline + :width 5) noise-blur))
 (def gcp1 (compose d-min (scanline d-min :width 5)))
-(def gcp2 (compose d-max (scanline d-linear-r :width 2)))
+(def gcp2 (compose d-max (scanline d-linear-r)))
 (def gcp3 (compose d-max (scanline d-euclidean-r :width 4)))
 (def gcp4 (compose d-max (scanline d-euclidean-r)))
 (def gcp5 (compose d-max (scanline d-min :width 3)))
@@ -159,19 +163,81 @@
 (def t1 (compose d-min (scanline + :width 5) noise-blur))
 (def t2 (compose d-min noise-blur (scanline + :width 5)))
 
+(defn neighbors [x y radius]
+  (for [i (range (- radius) (inc radius))
+        j (range (- radius) (inc radius))]
+    [(+ x i) (+ y j)]))
+
+(defn neighbors-colors [grid x y radius]
+  (for [[neighbors-x neighbors-y] (neighbors x y radius)]
+    (get-in grid [neighbors-x neighbors-y])))
+
+(defn split-into-rgb [color]
+  [(.getRed color) (.getGreen color) (.getBlue color)])
+
+(defn average-rgb-vectors [rgb-vectors]
+  [(average (map first rgb-vectors))
+   (average (map second rgb-vectors))
+   (average (map #(nth % 2) rgb-vectors))])
+
+(defn edgy-colors [colors]
+  (->> colors
+       (#(remove nil? %))
+       (map #(.getRGB %))
+       average Color.))
+
+(defn color-creator [[r g b]] (Color. r g b))
+
+(defn average-colors [colors]
+  (->> colors
+       (#(remove nil? %))
+       (map #(split-into-rgb %))
+       average-rgb-vectors
+       (#(map int %))
+       ((fn [[r g b]] (Color. r g b)))
+       ))
+
+(defn pp-edges [grid & {:keys [radius] :or {radius 2}}]
+  (into [] (for [x (range (.length grid))]
+   (into [] (for [y (range (.length (first grid)))]
+              (edgy-colors (neighbors-colors grid x y radius)))))))
+
+(defn pp-blur [grid & {:keys [radius] :or {radius 2}}]
+  (into [] (for [x (range (.length grid))]
+   (into [] (for [y (range (.length (first grid)))]
+              (average-colors (neighbors-colors grid x y radius)))))))
+
+
 (defn main []
-  (let [set-points (random-points MAX-POINTS SIZE SIZE)
+  (let [size 600
+        max-points 40
+        set-points (random-points max-points size size)
         easy-draw (fn [f-dist & name]
-                    (draw :size SIZE
-                          :closest-point-fn (get-closest-point-fn f-dist set-points)
-                          :name name
-                    ))]
-    (def xy (calculate-colors SIZE (get-closest-point-fn d-max set-points)))
-    (draw xy SIZE)
+                    (draw (calculate-colors
+                            size
+                            (get-closest-point-fn f-dist set-points))
+                          size))
+        draw-grid (fn [grid] (draw grid size))
+
+        grid (calculate-colors size (get-closest-point-fn gcp2 set-points))
+        blurred-grid (pp-blur grid :radius 4)
+        edged-blurred-grid (pp-edges blurred-grid :radius 2)
+        ]
+
+    (draw-grid grid)
+    (draw-grid blurred-grid)
+    (draw-grid edged-blurred-grid)
+
+    ; (println (calculate-colors size (get-closest-point-fn d-min set-points)))
+    ; (println (pp-blur (calculate-colors size (get-closest-point-fn d-min set-points))) )
+    ; (println (pp-blur (pp-edges (calculate-colors size (get-closest-point-fn d-min set-points)))) )
+
+    ; (def xy (calculate-colors SIZE (get-closest-point-fn d-max set-points)))
+    ; (draw xy SIZE)
     ; (easy-draw (compose d-avg (scanline2 d-min :width 3) noise-blur (scanline2 d-avg :width 3) (scanline2 d-max :width 3) (scanline2 d-linear :width 3)) "s4")
     ; (easy-draw (compose d-avg (scanline2 d-min) noise-blur (scanline2 d-avg) (scanline2 d-max) (scanline2 d-linear)) "s4")
     ; (easy-draw (compose d-avg (scanline2 d-min) (scanline2 d-avg) (scanline2 d-max) (scanline2 d-linear) ) "s4")
-))
+    ))
 
 
 (main)
