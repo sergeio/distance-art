@@ -163,46 +163,56 @@
 (def t1 (compose d-min (scanline + :width 5) noise-blur))
 (def t2 (compose d-min noise-blur (scanline + :width 5)))
 
+
+;;;;;;;;;;;;;;;;;
+; Post-processing
+;;;;;;;;;;;;;;;;;
+
 (defn neighbors [x y radius]
+  "Get the [x y] coordinates of points within a radius.  Can be negative."
   (for [i (range (- radius) (inc radius))
         j (range (- radius) (inc radius))]
     [(+ x i) (+ y j)]))
 
 (defn neighbors-colors [grid x y radius]
+  "Get the Colors of all the points in the grid within a radius of (x, y)."
   (for [[neighbors-x neighbors-y] (neighbors x y radius)]
     (get-in grid [neighbors-x neighbors-y])))
 
 (defn split-into-rgb [color]
+  "Takes a java.awt.Color, and splits into component [r g b]."
   [(.getRed color) (.getGreen color) (.getBlue color)])
 
-(defn average-rgb-vectors [rgb-vectors]
-  [(average (map first rgb-vectors))
-   (average (map second rgb-vectors))
-   (average (map #(nth % 2) rgb-vectors))])
-
 (defn edgy-colors [colors]
+  "Combines the java.awt.Colors in a weird way. Yes. It's very technical."
   (->> colors
        (#(remove nil? %))
        (map #(.getRGB %))
        average Color.))
 
-(defn color-creator [[r g b]] (Color. r g b))
+(defn average-rgb-vectors [rgb-vectors]
+  "Takes a sequence of [r g b] vectors, and returns the average [r g b]."
+  [(average (map first rgb-vectors))
+   (average (map second rgb-vectors))
+   (average (map #(nth % 2) rgb-vectors))])
 
 (defn average-colors [colors]
+  "Takes in a sequence of java.awt.Color, and averages them into 1 Color"
   (->> colors
        (#(remove nil? %))
        (map #(split-into-rgb %))
        average-rgb-vectors
        (#(map int %))
-       ((fn [[r g b]] (Color. r g b)))
-       ))
+       ((fn [[r g b]] (Color. r g b)))))
 
 (defn pp-edges [grid & {:keys [radius] :or {radius 2}}]
+  "Post processing of grid: make the edges weirder."
   (into [] (for [x (range (.length grid))]
    (into [] (for [y (range (.length (first grid)))]
               (edgy-colors (neighbors-colors grid x y radius)))))))
 
 (defn pp-blur [grid & {:keys [radius] :or {radius 2}}]
+  "Post processing of grid: blur"
   (into [] (for [x (range (.length grid))]
    (into [] (for [y (range (.length (first grid)))]
               (average-colors (neighbors-colors grid x y radius)))))))
@@ -224,19 +234,17 @@
         edged-blurred-grid (pp-edges blurred-grid :radius 2)
         ]
 
-    (draw-grid grid)
-    (draw-grid blurred-grid)
-    (draw-grid edged-blurred-grid)
+    (easy-draw d-euclidean "d-euclidean")
+    (easy-draw d-min "d-min")
 
-    ; (println (calculate-colors size (get-closest-point-fn d-min set-points)))
-    ; (println (pp-blur (calculate-colors size (get-closest-point-fn d-min set-points))) )
-    ; (println (pp-blur (pp-edges (calculate-colors size (get-closest-point-fn d-min set-points)))) )
+    (easy-draw (fn [x1 y1 x2 y2]
+                  (if (even? (int (d-euclidean x1 y1 x2 y2)))
+                    Double/MAX_VALUE
+                    (d-euclidean x1 y1 x2 y2))) "my-little-scanline")
 
-    ; (def xy (calculate-colors SIZE (get-closest-point-fn d-max set-points)))
-    ; (draw xy SIZE)
-    ; (easy-draw (compose d-avg (scanline2 d-min :width 3) noise-blur (scanline2 d-avg :width 3) (scanline2 d-max :width 3) (scanline2 d-linear :width 3)) "s4")
-    ; (easy-draw (compose d-avg (scanline2 d-min) noise-blur (scanline2 d-avg) (scanline2 d-max) (scanline2 d-linear)) "s4")
-    ; (easy-draw (compose d-avg (scanline2 d-min) (scanline2 d-avg) (scanline2 d-max) (scanline2 d-linear) ) "s4")
+    (def scanline-min-max-distance (compose d-euclidean (scanline d-min) (scanline d-max)))
+    (easy-draw scanline-min-max-distance "scanline-min-max-distance")
+    (easy-draw (compose d-euclidean noise-blur))
     ))
 
 
