@@ -2,6 +2,8 @@ Distance Art
 ============
 
 Create random pretty pictures based on "distance" functions.
+This is also called a [Voronoi Diagram](http://en.wikipedia.org/wiki/
+Voronoi_diagram).
 
 ### So take me through it ###
 
